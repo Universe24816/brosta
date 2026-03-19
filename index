@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>ホッピング忍者</title>
+<style>
+body {
+  margin: 0;
+  background: #111;
+  overflow: hidden;
+  font-family: sans-serif;
+}
+
+canvas {
+  display: block;
+  margin: auto;
+  background: linear-gradient(#222, #444);
+}
+
+#ui {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  color: white;
+  font-size: 20px;
+}
+</style>
+</head>
+<body>
+
+<div id="ui">スコア: 0</div>
+<canvas id="game" width="800" height="400"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+let gravity = 0.6;
+let score = 0;
+let gameOver = false;
+
+// 忍者
+let ninja = {
+  x: 100,
+  y: 300,
+  radius: 20,
+  vy: 0,
+  jumping: false
+};
+
+// 障害物
+let obstacles = [];
+
+// 地面
+const ground = 350;
+
+// 入力
+document.addEventListener("keydown", () => jump());
+canvas.addEventListener("click", () => jump());
+
+function jump() {
+  if (!ninja.jumping && !gameOver) {
+    ninja.vy = -12;
+    ninja.jumping = true;
+  }
+}
+
+// 障害物生成
+function createObstacle() {
+  let height = 30 + Math.random() * 40;
+  obstacles.push({
+    x: canvas.width,
+    y: ground - height,
+    width: 20,
+    height: height
+  });
+}
+
+// 衝突判定
+function collision(a, b) {
+  return a.x + a.radius > b.x &&
+         a.x - a.radius < b.x + b.width &&
+         a.y + a.radius > b.y;
+}
+
+// 更新処理
+function update() {
+  if (gameOver) return;
+
+  // 忍者
+  ninja.vy += gravity;
+  ninja.y += ninja.vy;
+
+  if (ninja.y >= ground) {
+    ninja.y = ground;
+    ninja.vy = 0;
+    ninja.jumping = false;
+  }
+
+  // 障害物
+  if (Math.random() < 0.02) createObstacle();
+
+  obstacles.forEach(o => {
+    o.x -= 5;
+
+    if (collision(ninja, o)) {
+      gameOver = true;
+      alert("ゲームオーバー！スコア: " + score);
+      location.reload();
+    }
+  });
+
+  // 削除
+  obstacles = obstacles.filter(o => o.x + o.width > 0);
+
+  score++;
+  document.getElementById("ui").innerText = "スコア: " + score;
+}
+
+// 描画
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // 地面
+  ctx.fillStyle = "#2ecc71";
+  ctx.fillRect(0, ground, canvas.width, 50);
+
+  // 忍者
+  ctx.fillStyle = "black";
+  ctx.beginPath();
+  ctx.arc(ninja.x, ninja.y, ninja.radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 目
+  ctx.fillStyle = "white";
+  ctx.fillRect(ninja.x - 5, ninja.y - 5, 4, 4);
+
+  // 障害物
+  ctx.fillStyle = "red";
+  obstacles.forEach(o => {
+    ctx.fillRect(o.x, o.y, o.width, o.height);
+  });
+}
+
+// ループ
+function gameLoop() {
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+
+</body>
+</html>
