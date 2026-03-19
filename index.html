@@ -3,126 +3,126 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>神ゲー版ミニブロスタ風</title>
+<title>ブロスタ風・進化版</title>
 <style>
-body{margin:0;background:#0d0d0d;color:#fff;font-family:sans-serif;text-align:center}
-canvas{background:#1a1a1a;display:block;margin:10px auto;border:3px solid #555}
-#ui{width:600px;margin:0 auto;display:flex;justify-content:space-between}
-.bar{height:10px;background:#444;border-radius:5px;overflow:hidden}
-#hpBar{width:200px}
-#hpFill{height:100%;background:#0f0}
-#ultBar{width:200px}
-#ultFill{height:100%;background:#0ff}
+body{margin:0;background:#0b0f14;color:#fff;font-family:sans-serif;text-align:center}
+canvas{background:#18222d;display:block;margin:10px auto;border:3px solid #333;touch-action:none}
+#modeSelect{margin:10px}
+button{padding:10px 20px;margin:5px;border:none;border-radius:10px;background:#00c8ff;color:#000;font-weight:bold;cursor:pointer}
 </style>
 </head>
 <body>
-<h2>🔥 神ゲー版ブロスタ風 🔥</h2>
-<div id="ui">
-<div>❤️<div id="hpBar" class="bar"><div id="hpFill"></div></div></div>
-<div>⚡<div id="ultBar" class="bar"><div id="ultFill"></div></div></div>
-<div>⭐<span id="score">0</span></div>
+<h2>🎮 ブロスタ風・進化版</h2>
+<div id="modeSelect">
+<button onclick="startGame('battle')">バトル</button>
+<button onclick="startGame('survival')">サバイバル</button>
 </div>
 <canvas id="game" width="600" height="400"></canvas>
 
 <script>
 const c=document.getElementById("game"),ctx=c.getContext("2d");
-let mouse={x:300,y:200};
-c.onmousemove=e=>{let r=c.getBoundingClientRect();mouse.x=e.clientX-r.left;mouse.y=e.clientY-r.top};
+let mode="battle";
 
-let player={x:300,y:200,size:15,speed:3,hp:100,maxHp:100,cd:0,ult:0};
-let bullets=[],enemies=[],walls=[];
-let score=0;
+let player, enemies, bullets;
+let moveTouch=null, aimTouch=null;
 
-// 壁生成
-for(let i=0;i<5;i++){
- walls.push({x:Math.random()*500,y:Math.random()*300,w:50,h:50});
+function startGame(m){
+ mode=m;
+ player={x:300,y:200,size:15,hp:100};
+ enemies=[{x:500,y:200,size:15,hp:100}];
+ bullets=[];
 }
+startGame("battle");
 
-const keys={};
-document.onkeydown=e=>keys[e.key.toLowerCase()]=true;
-document.onkeyup=e=>keys[e.key.toLowerCase()]=false;
+// タッチ操作
+c.addEventListener("touchstart",e=>{
+ for(let t of e.touches){
+  if(t.clientX < window.innerWidth/2) moveTouch=t.identifier;
+  else aimTouch=t.identifier;
+ }
+});
 
-function spawnEnemy(){
- let type=Math.random();
- let x=Math.random()*600,y=Math.random()*400;
- if(type<0.5) enemies.push({x,y,size:15,speed:1,hp:2,type:"normal"});
- else enemies.push({x,y,size:10,speed:2,hp:1,type:"fast"});
-}
-setInterval(spawnEnemy,1000);
+c.addEventListener("touchmove",e=>{
+ for(let t of e.touches){
+  let rect=c.getBoundingClientRect();
+  let x=t.clientX-rect.left;
+  let y=t.clientY-rect.top;
 
-c.onclick=shoot;
-function shoot(){
- if(player.cd>0)return;
- let dx=mouse.x-player.x,dy=mouse.y-player.y,d=Math.hypot(dx,dy);
- bullets.push({x:player.x,y:player.y,dx:dx/d*6,dy:dy/d*6});
- player.cd=10;
-}
+  if(t.identifier===moveTouch){
+    player.x=x;
+    player.y=y;
+  }
+  if(t.identifier===aimTouch){
+    shoot(player,{x,y});
+  }
+ }
+});
 
-function useUlt(){
- if(player.ult<100)return;
- enemies=[];
- player.ult=0;
+c.addEventListener("touchend",()=>{
+ moveTouch=null; aimTouch=null;
+});
+
+function shoot(shooter,target){
+ let dx=target.x-shooter.x,dy=target.y-shooter.y,d=Math.hypot(dx,dy);
+ bullets.push({x:shooter.x,y:shooter.y,dx:dx/d*6,dy:dy/d*6,owner:shooter});
 }
 
 function update(){
- if(keys["w"])player.y-=player.speed;
- if(keys["s"])player.y+=player.speed;
- if(keys["a"])player.x-=player.speed;
- if(keys["d"])player.x+=player.speed;
- if(keys["shift"])useUlt();
+ if(mode==="battle"){
+  let enemy=enemies[0];
+  let dx=player.x-enemy.x,dy=player.y-enemy.y,d=Math.hypot(dx,dy);
+  enemy.x+=dx/d*1.2;
+  enemy.y+=dy/d*1.2;
+  if(Math.random()<0.03)shoot(enemy,player);
+ }
 
- player.x=Math.max(0,Math.min(600,player.x));
- player.y=Math.max(0,Math.min(400,player.y));
-
- if(player.cd>0)player.cd--;
-
- bullets.forEach(b=>{b.x+=b.dx;b.y+=b.dy});
-
- enemies.forEach(e=>{
-  let dx=player.x-e.x,dy=player.y-e.y,d=Math.hypot(dx,dy);
-  e.x+=dx/d*e.speed;e.y+=dy/d*e.speed;
-  if(d<e.size+player.size)player.hp-=0.4;
- });
+ if(mode==="survival"){
+  if(Math.random()<0.02){
+    enemies.push({x:Math.random()*600,y:Math.random()*400,size:12,hp:20});
+  }
+  enemies.forEach(e=>{
+    let dx=player.x-e.x,dy=player.y-e.y,d=Math.hypot(dx,dy);
+    e.x+=dx/d*1.5; e.y+=dy/d*1.5;
+  });
+ }
 
  bullets.forEach((b,bi)=>{
+  b.x+=b.dx; b.y+=b.dy;
   enemies.forEach((e,ei)=>{
-   if(Math.hypot(b.x-e.x,b.y-e.y)<e.size){
-    e.hp--; bullets.splice(bi,1);
-    if(e.hp<=0){enemies.splice(ei,1);score++;player.ult+=10}
-   }
+    if(Math.hypot(b.x-e.x,b.y-e.y)<e.size){
+      e.hp-=10;
+      bullets.splice(bi,1);
+      if(e.hp<=0) enemies.splice(ei,1);
+    }
   });
  });
 
- document.getElementById("score").textContent=score;
- document.getElementById("hpFill").style.width=(player.hp/player.maxHp*100)+"%";
- document.getElementById("ultFill").style.width=player.ult+"%";
+ enemies.forEach(e=>{
+  if(Math.hypot(player.x-e.x,player.y-e.y)<e.size){
+    player.hp-=0.2;
+  }
+ });
 
- if(player.hp<=0){alert("GAME OVER スコア:"+score);location.reload();}
+ if(player.hp<=0){alert("ゲームオーバー");startGame(mode);}
 }
 
 function draw(){
  ctx.clearRect(0,0,600,400);
 
- // 壁
- ctx.fillStyle="#666";
- walls.forEach(w=>ctx.fillRect(w.x,w.y,w.w,w.h));
-
  // プレイヤー
- ctx.fillStyle="#0af";
+ ctx.fillStyle="#00c8ff";
  ctx.beginPath();ctx.arc(player.x,player.y,player.size,0,6.28);ctx.fill();
 
- // 照準
- ctx.strokeStyle="#fff";
- ctx.beginPath();ctx.moveTo(player.x,player.y);ctx.lineTo(mouse.x,mouse.y);ctx.stroke();
+ // 敵
+ ctx.fillStyle="#ff3b3b";
+ enemies.forEach(e=>{
+  ctx.beginPath();ctx.arc(e.x,e.y,e.size,0,6.28);ctx.fill();
+ });
 
  // 弾
- ctx.fillStyle="#ff0";
- bullets.forEach(b=>{ctx.beginPath();ctx.arc(b.x,b.y,4,0,6.28);ctx.fill()});
-
- // 敵
- enemies.forEach(e=>{
-  ctx.fillStyle=e.type=="fast"?"#f0f":"#f33";
-  ctx.beginPath();ctx.arc(e.x,e.y,e.size,0,6.28);ctx.fill();
+ ctx.fillStyle="#ffd700";
+ bullets.forEach(b=>{
+  ctx.beginPath();ctx.arc(b.x,b.y,4,0,6.28);ctx.fill();
  });
 }
 
