@@ -2,201 +2,203 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>ブロスタ風サッカー</title>
+<title>ブロスタ風サッカー進化版</title>
 <style>
-body {
-  margin: 0;
-  background: #2ecc71;
-  overflow: hidden;
-  font-family: sans-serif;
-}
-#game {
-  display: block;
-  margin: auto;
-  background: #27ae60;
-}
+body { margin:0; background:#1e8449; overflow:hidden; }
+canvas { display:block; margin:auto; background:#27ae60; }
 #ui {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  color: white;
-  font-size: 20px;
+  position:absolute;
+  top:10px; left:10px;
+  color:white; font-size:20px;
 }
-#shootBtn {
-  position: absolute;
-  bottom: 30px;
-  right: 30px;
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: red;
-  color: white;
-  font-size: 20px;
-  border: none;
+.btn {
+  position:absolute;
+  width:70px; height:70px;
+  border-radius:50%;
+  color:white; border:none;
 }
+#shoot { bottom:30px; right:30px; background:red; }
+#dash { bottom:30px; right:120px; background:blue; }
 </style>
 </head>
 <body>
 
 <div id="ui">0 - 0</div>
-<canvas id="game" width="800" height="500"></canvas>
-<button id="shootBtn">SHOOT</button>
+<canvas id="game" width="900" height="500"></canvas>
+<button id="shoot" class="btn">SHOOT</button>
+<button id="dash" class="btn">DASH</button>
 
 <script>
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+const c = game;
+const ctx = c.getContext("2d");
 
-let player = { x: 100, y: 250, r: 15, speed: 3 };
-let enemy = { x: 700, y: 250, r: 15, speed: 2 };
-let ball = { x: 400, y: 250, r: 10, vx: 0, vy: 0 };
+let scoreA=0, scoreB=0;
 
-let scoreA = 0;
-let scoreB = 0;
+function createPlayer(x,y,color){
+  return {x,y,vx:0,vy:0,r:12,color,hasBall:false,dash:0};
+}
 
-let keys = {};
-let touch = null;
+let teamA = [
+  createPlayer(100,250,"blue"),
+  createPlayer(150,150,"blue"),
+  createPlayer(150,350,"blue")
+];
 
-// キー操作
-document.addEventListener("keydown", e => keys[e.key] = true);
-document.addEventListener("keyup", e => keys[e.key] = false);
+let teamB = [
+  createPlayer(800,250,"red"),
+  createPlayer(750,150,"red"),
+  createPlayer(750,350,"red")
+];
 
-// タッチ操作
-canvas.addEventListener("touchmove", e => {
-  const rect = canvas.getBoundingClientRect();
-  touch = {
-    x: e.touches[0].clientX - rect.left,
-    y: e.touches[0].clientY - rect.top
+let player = teamA[0];
+
+let ball = {x:450,y:250,vx:0,vy:0,r:8,owner:null};
+
+let walls = [
+  {x:350,y:150,w:20,h:200},
+  {x:530,y:150,w:20,h:200}
+];
+
+// タッチ
+let touch=null;
+c.addEventListener("touchmove",e=>{
+  const r=c.getBoundingClientRect();
+  touch={
+    x:e.touches[0].clientX-r.left,
+    y:e.touches[0].clientY-r.top
   };
 });
 
 // シュート
-document.getElementById("shootBtn").onclick = () => shoot();
-
-function shoot() {
-  let dx = ball.x - player.x;
-  let dy = ball.y - player.y;
-  let dist = Math.hypot(dx, dy);
-
-  if (dist < 40) {
-    ball.vx = dx * 0.3;
-    ball.vy = dy * 0.3;
+shoot.onclick=()=>{
+  if(ball.owner===player){
+    ball.owner=null;
+    ball.vx=5;
+    ball.vy=(Math.random()-0.5)*4;
   }
-}
+};
 
-// プレイヤー移動
-function movePlayer() {
-  if (keys["w"]) player.y -= player.speed;
-  if (keys["s"]) player.y += player.speed;
-  if (keys["a"]) player.x -= player.speed;
-  if (keys["d"]) player.x += player.speed;
+// ダッシュ
+dash.onclick=()=>{
+  if(player.dash<=0){
+    player.vx*=5;
+    player.vy*=5;
+    player.dash=100;
+  }
+};
 
-  if (touch) {
-    player.x += (touch.x - player.x) * 0.1;
-    player.y += (touch.y - player.y) * 0.1;
+function movePlayer(p){
+  if(p===player && touch){
+    p.vx=(touch.x-p.x)*0.1;
+    p.vy=(touch.y-p.y)*0.1;
   }
 
-  clamp(player);
-}
+  p.x+=p.vx;
+  p.y+=p.vy;
 
-// 敵AI
-function moveEnemy() {
-  let dx = ball.x - enemy.x;
-  let dy = ball.y - enemy.y;
+  p.vx*=0.8;
+  p.vy*=0.8;
 
-  enemy.x += dx * 0.02;
-  enemy.y += dy * 0.02;
-
-  // ボール蹴る
-  let dist = Math.hypot(dx, dy);
-  if (dist < 30) {
-    ball.vx = dx * 0.2;
-    ball.vy = dy * 0.2;
-  }
-}
-
-// ボール
-function moveBall() {
-  ball.x += ball.vx;
-  ball.y += ball.vy;
-
-  ball.vx *= 0.98;
-  ball.vy *= 0.98;
-
-  // 壁反射
-  if (ball.y < 0 || ball.y > canvas.height) ball.vy *= -1;
-
-  // ゴール判定
-  if (ball.x < 0 && ball.y > 180 && ball.y < 320) {
-    scoreB++;
-    reset();
-  }
-  if (ball.x > canvas.width && ball.y > 180 && ball.y < 320) {
-    scoreA++;
-    reset();
-  }
+  if(p.dash>0)p.dash--;
 
   // 壁
-  if (ball.x < 0 || ball.x > canvas.width) ball.vx *= -1;
+  walls.forEach(w=>{
+    if(p.x>w.x && p.x<w.x+w.w && p.y>w.y && p.y<w.y+w.h){
+      p.x-=p.vx;
+      p.y-=p.vy;
+    }
+  });
 }
 
-// 初期化
-function reset() {
-  ball.x = 400;
-  ball.y = 250;
-  ball.vx = 0;
-  ball.vy = 0;
+function ai(p){
+  let target=ball.owner?ball.owner:ball;
+  p.vx+=(target.x-p.x)*0.01;
+  p.vy+=(target.y-p.y)*0.01;
 }
 
-// 範囲制限
-function clamp(p) {
-  p.x = Math.max(p.r, Math.min(canvas.width - p.r, p.x));
-  p.y = Math.max(p.r, Math.min(canvas.height - p.r, p.y));
-}
+function updateBall(){
+  if(ball.owner){
+    ball.x=ball.owner.x;
+    ball.y=ball.owner.y;
+  } else {
+    ball.x+=ball.vx;
+    ball.y+=ball.vy;
+    ball.vx*=0.98;
+    ball.vy*=0.98;
+  }
 
-// 描画
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // 壁反射
+  walls.forEach(w=>{
+    if(ball.x>w.x && ball.x<w.x+w.w && ball.y>w.y && ball.y<w.y+w.h){
+      ball.vx*=-1;
+    }
+  });
 
-  // フィールド
-  ctx.fillStyle = "#2ecc71";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // 取得判定
+  [...teamA,...teamB].forEach(p=>{
+    let d=Math.hypot(p.x-ball.x,p.y-ball.y);
+    if(d<15){
+      ball.owner=p;
+    }
+  });
 
   // ゴール
-  ctx.fillStyle = "white";
-  ctx.fillRect(0, 180, 10, 140);
-  ctx.fillRect(790, 180, 10, 140);
+  if(ball.x<0 && ball.y>180 && ball.y<320){
+    scoreB++; reset();
+  }
+  if(ball.x>c.width && ball.y>180 && ball.y<320){
+    scoreA++; reset();
+  }
+}
+
+function reset(){
+  ball={x:450,y:250,vx:0,vy:0,r:8,owner:null};
+}
+
+function draw(){
+  ctx.clearRect(0,0,c.width,c.height);
+
+  // 壁
+  ctx.fillStyle="gray";
+  walls.forEach(w=>ctx.fillRect(w.x,w.y,w.w,w.h));
+
+  // ゴール
+  ctx.fillStyle="white";
+  ctx.fillRect(0,180,10,140);
+  ctx.fillRect(890,180,10,140);
 
   // プレイヤー
-  ctx.fillStyle = "blue";
-  ctx.beginPath();
-  ctx.arc(player.x, player.y, player.r, 0, Math.PI*2);
-  ctx.fill();
-
-  // 敵
-  ctx.fillStyle = "red";
-  ctx.beginPath();
-  ctx.arc(enemy.x, enemy.y, enemy.r, 0, Math.PI*2);
-  ctx.fill();
+  [...teamA,...teamB].forEach(p=>{
+    ctx.fillStyle=p.color;
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctx.fill();
+  });
 
   // ボール
-  ctx.fillStyle = "white";
+  ctx.fillStyle="white";
   ctx.beginPath();
-  ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2);
+  ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2);
   ctx.fill();
 
-  document.getElementById("ui").innerText = `${scoreA} - ${scoreB}`;
+  ui.innerText=`${scoreA} - ${scoreB}`;
 }
 
-// ループ
-function update() {
-  movePlayer();
-  moveEnemy();
-  moveBall();
+function loop(){
+  movePlayer(player);
+
+  teamA.slice(1).forEach(ai);
+  teamB.forEach(ai);
+
+  [...teamA,...teamB].forEach(movePlayer);
+
+  updateBall();
   draw();
-  requestAnimationFrame(update);
+
+  requestAnimationFrame(loop);
 }
 
-update();
+loop();
 </script>
 
 </body>
