@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>神ゲー版ミニブロスタ風</title>
+<style>
+body{margin:0;background:#0d0d0d;color:#fff;font-family:sans-serif;text-align:center}
+canvas{background:#1a1a1a;display:block;margin:10px auto;border:3px solid #555}
+#ui{width:600px;margin:0 auto;display:flex;justify-content:space-between}
+.bar{height:10px;background:#444;border-radius:5px;overflow:hidden}
+#hpBar{width:200px}
+#hpFill{height:100%;background:#0f0}
+#ultBar{width:200px}
+#ultFill{height:100%;background:#0ff}
+</style>
+</head>
+<body>
+<h2>🔥 神ゲー版ブロスタ風 🔥</h2>
+<div id="ui">
+<div>❤️<div id="hpBar" class="bar"><div id="hpFill"></div></div></div>
+<div>⚡<div id="ultBar" class="bar"><div id="ultFill"></div></div></div>
+<div>⭐<span id="score">0</span></div>
+</div>
+<canvas id="game" width="600" height="400"></canvas>
+
+<script>
+const c=document.getElementById("game"),ctx=c.getContext("2d");
+let mouse={x:300,y:200};
+c.onmousemove=e=>{let r=c.getBoundingClientRect();mouse.x=e.clientX-r.left;mouse.y=e.clientY-r.top};
+
+let player={x:300,y:200,size:15,speed:3,hp:100,maxHp:100,cd:0,ult:0};
+let bullets=[],enemies=[],walls=[];
+let score=0;
+
+// 壁生成
+for(let i=0;i<5;i++){
+ walls.push({x:Math.random()*500,y:Math.random()*300,w:50,h:50});
+}
+
+const keys={};
+document.onkeydown=e=>keys[e.key.toLowerCase()]=true;
+document.onkeyup=e=>keys[e.key.toLowerCase()]=false;
+
+function spawnEnemy(){
+ let type=Math.random();
+ let x=Math.random()*600,y=Math.random()*400;
+ if(type<0.5) enemies.push({x,y,size:15,speed:1,hp:2,type:"normal"});
+ else enemies.push({x,y,size:10,speed:2,hp:1,type:"fast"});
+}
+setInterval(spawnEnemy,1000);
+
+c.onclick=shoot;
+function shoot(){
+ if(player.cd>0)return;
+ let dx=mouse.x-player.x,dy=mouse.y-player.y,d=Math.hypot(dx,dy);
+ bullets.push({x:player.x,y:player.y,dx:dx/d*6,dy:dy/d*6});
+ player.cd=10;
+}
+
+function useUlt(){
+ if(player.ult<100)return;
+ enemies=[];
+ player.ult=0;
+}
+
+function update(){
+ if(keys["w"])player.y-=player.speed;
+ if(keys["s"])player.y+=player.speed;
+ if(keys["a"])player.x-=player.speed;
+ if(keys["d"])player.x+=player.speed;
+ if(keys["shift"])useUlt();
+
+ player.x=Math.max(0,Math.min(600,player.x));
+ player.y=Math.max(0,Math.min(400,player.y));
+
+ if(player.cd>0)player.cd--;
+
+ bullets.forEach(b=>{b.x+=b.dx;b.y+=b.dy});
+
+ enemies.forEach(e=>{
+  let dx=player.x-e.x,dy=player.y-e.y,d=Math.hypot(dx,dy);
+  e.x+=dx/d*e.speed;e.y+=dy/d*e.speed;
+  if(d<e.size+player.size)player.hp-=0.4;
+ });
+
+ bullets.forEach((b,bi)=>{
+  enemies.forEach((e,ei)=>{
+   if(Math.hypot(b.x-e.x,b.y-e.y)<e.size){
+    e.hp--; bullets.splice(bi,1);
+    if(e.hp<=0){enemies.splice(ei,1);score++;player.ult+=10}
+   }
+  });
+ });
+
+ document.getElementById("score").textContent=score;
+ document.getElementById("hpFill").style.width=(player.hp/player.maxHp*100)+"%";
+ document.getElementById("ultFill").style.width=player.ult+"%";
+
+ if(player.hp<=0){alert("GAME OVER スコア:"+score);location.reload();}
+}
+
+function draw(){
+ ctx.clearRect(0,0,600,400);
+
+ // 壁
+ ctx.fillStyle="#666";
+ walls.forEach(w=>ctx.fillRect(w.x,w.y,w.w,w.h));
+
+ // プレイヤー
+ ctx.fillStyle="#0af";
+ ctx.beginPath();ctx.arc(player.x,player.y,player.size,0,6.28);ctx.fill();
+
+ // 照準
+ ctx.strokeStyle="#fff";
+ ctx.beginPath();ctx.moveTo(player.x,player.y);ctx.lineTo(mouse.x,mouse.y);ctx.stroke();
+
+ // 弾
+ ctx.fillStyle="#ff0";
+ bullets.forEach(b=>{ctx.beginPath();ctx.arc(b.x,b.y,4,0,6.28);ctx.fill()});
+
+ // 敵
+ enemies.forEach(e=>{
+  ctx.fillStyle=e.type=="fast"?"#f0f":"#f33";
+  ctx.beginPath();ctx.arc(e.x,e.y,e.size,0,6.28);ctx.fill();
+ });
+}
+
+function loop(){update();draw();requestAnimationFrame(loop)}
+loop();
+</script>
+</body>
+</html>
